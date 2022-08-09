@@ -28,6 +28,7 @@ class Configurator:
     _cfg = {}
     def __init__(self, cfg: dict) -> None:
         self.cfg = cfg
+        self.languages = ["pl_PL", "en_US"]
 
     @property
     def cfg(self) -> dict:
@@ -74,6 +75,16 @@ class Configurator:
 
     def set_complience_test(self, airos: Executor) -> None:
         airos.exec("touch /etc/persistent/ ct")
+
+    def set_hostname(self, hostname: str) -> None:
+        self._cfg["resolv.host.1.status"] = "enabled"
+        self._cfg["resolv.host.1.name"] = hostname
+    
+    def change_language(self, language: str) -> None:
+        if language not in self.languages:
+            print("Language not in language list!")
+            return
+        self.cfg["gui.language"] = language
 
 
 parser = argparse.ArgumentParser(description="Automated airos ssh configuration tool")
