@@ -1,12 +1,22 @@
 from finder import Finder
 from iplist import Address
 from connector import Executor
+from iplist import Port
 
 from paramiko.ssh_exception import SSHException
 from paramiko.ssh_exception import NoValidConnectionsError
 from paramiko.ssh_exception import AuthenticationException
 import os
 import copy
+from time import sleep
+
+
+def find_ssh_password(addr: Address, uname: str, pass_list: list):
+    for passwd in pass_list:
+        code = os.system(f'sshpass -p "{passwd}" ssh -o StrictHostKeyChecking=no -t -l "{uname}" {str(addr)} ":" > /dev/null 2>&1')
+        if code == 0:
+            return passwd
+    return None
 
 
 class Configurator:
@@ -63,6 +73,11 @@ class Configurator:
 
 
 passwords = [
+    "haslo",
+    "text",
+    "password",
+    "qwerty",
+    "test",
     "ubnt",
     "Qwerty12",
     "haslo123"
@@ -78,22 +93,25 @@ if not len(devices):
 uname = "ubnt"
 for addr in devices:
     print("Trying:", str(addr))
-    skip = False
-    for passwd in passwords:
-        try:
-            airos = Executor(str(addr), 22, uname, passwd)
-            new_passwd = passwd
-            print(f"Logged in with uname={uname}, passwd={passwd}")
-        except NoValidConnectionsError:
-            print(f"{addr} not SSH")
-            skip = True
-        except AuthenticationException:
-            print(f"Password `{passwd}` is not valid, trying another")
-            continue
-        break
-
-    if skip:
+    if not bool(Port(addr, 22)):
+        print(f"SSH port not open at {addr}")
         continue
+
+    print("Searching for password...")
+    passwd = find_ssh_password(addr, uname, passwords)
+    if passwd is None:
+        raise ValueError("Correct password was not found!")
+    print("Password found:", passwd)
+
+    try:
+        airos = Executor(str(addr), 22, uname, passwd)
+        new_passwd = passwd
+        print(f"Logged in with uname={uname}, passwd={passwd}")
+    except NoValidConnectionsError:
+        print(f"{addr} not SSH")
+        continue
+    except AuthenticationException:
+        raise ValueError(f"Password `{passwd}` is not valid!")
 
     airos.exec("cp /tmp/system.cfg ~/system.cfg.bak")
 
@@ -115,12 +133,12 @@ for addr in devices:
     new_cfg_lines = [f"{elem_key}={new_cfg[elem_key]}\n" for elem_key in list(new_cfg.keys())]
 
     if new_cfg_lines != raw_cfg:
-        print(new_cfg_lines)
+        # print(new_cfg_lines)
         open("local-system.cfg", "w").writelines(new_cfg_lines)
         print(f"Trying to upload configuration file with `{new_passwd}` password")
         if os.system(f'sshpass -p "{new_passwd}" scp -o StrictHostKeyChecking=no -O local-system.cfg {uname}@{str(addr)}:/tmp/system.cfg') == 0:
             print("Configuration saved!")
-            print(airos.exec("cfgmtd -w && reboot"))
+            # print(airos.exec("cfgmtd -w && reboot"))
         else:
             raise Exception("Error while uploading configuration file!")
 
