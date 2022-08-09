@@ -5,9 +5,9 @@ import os  # For pinging
 import socket  # For port checking
 import concurrent.futures  # For multithreading
 
-from classes.icomparators import icomparators  # For comparing addresses
-from classes.mathematics import imathematics  # For math on addresses
-from classes.binary import binary_sum, binary_sub  # For binary math
+from .interfaces.icomparators import icomparators  # For comparing addresses
+from .interfaces.mathematics import imathematics  # For math on addresses
+from .interfaces.binary import binary_sum, binary_sub  # For binary math
 
 TAddress = TypeVar("TAddress", bound="Address")
 

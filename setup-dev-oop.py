@@ -1,7 +1,7 @@
-from finder import Finder
-from iplist import Address
-from connector import Executor
-from iplist import Port
+from classes.finder import Finder
+from classes.iplist import Address
+from classes.connector import Executor
+from classes.iplist import Port
 
 from paramiko.ssh_exception import SSHException, NoValidConnectionsError, AuthenticationException
 import os

@@ -1,4 +1,4 @@
-from iplist import IPList, Address
+from .iplist import IPList, Address
 from argparse import ArgumentParser
 import os
 import concurrent.futures
