@@ -3,18 +3,23 @@ from iplist import Address
 from connector import Executor
 from iplist import Port
 
-from paramiko.ssh_exception import SSHException
-from paramiko.ssh_exception import NoValidConnectionsError
-from paramiko.ssh_exception import AuthenticationException
+from paramiko.ssh_exception import SSHException, NoValidConnectionsError, AuthenticationException
 import os
 import copy
-from time import sleep
+import argparse
+
+INFO = "*"
+SUCCESS = "+"
+FAILURE = "-"
+ERROR = "!"
+
+def message(text: str, prefix: str):
+    print(f"[{prefix}] {text}")
 
 
 def find_ssh_password(addr: Address, uname: str, pass_list: list):
     for passwd in pass_list:
-        code = os.system(f'sshpass -p "{passwd}" ssh -o StrictHostKeyChecking=no -t -l "{uname}" {str(addr)} ":" > /dev/null 2>&1')
-        if code == 0:
+        if os.system(f'sshpass -p "{passwd}" ssh -o StrictHostKeyChecking=no -t -l "{uname}" {str(addr)} ":" > /dev/null 2>&1') == 0:
             return passwd
     return None
 
@@ -59,9 +64,8 @@ class Configurator:
         passwd_hash = airos.read_file("/etc/passwd")
         for line in passwd_hash:
             if uname in line:
-                passwd_hash = line
+                passwd_hash = line.split(":")
                 break
-        passwd_hash = passwd_hash.split(":")
         for i, elem in enumerate(passwd_hash):
             if uname in elem:
                 passwd_hash = passwd_hash[i+1]
@@ -72,43 +76,67 @@ class Configurator:
         airos.exec("touch /etc/persistent/ ct")
 
 
-passwords = [
-    "haslo",
-    "text",
-    "password",
-    "qwerty",
-    "test",
-    "ubnt",
-    "Qwerty12",
-    "haslo123"
-]
+parser = argparse.ArgumentParser(description="Automated airos ssh configuration tool")
+parser.add_argument("net_address", type=str, help="Network address")
+parser.add_argument("mask", type=str, help="Mask address")
+parser.add_argument("uname", type=str, help="User name on devices")
+parser.add_argument("passwords", type=str, help="Password list or path to file with list")
+parser.add_argument("--do-restart", "-r", action="store_true", help="Perform reboot after saving configuration")
+parser.add_argument("--new-password", "-p", type=str, help="New password to set on all devices")
+parser.add_argument("--smart-passwords", type=str, help="Path to file with new passwords assigned to specific ip addresses. (format: IP:PASS)")
+args = vars(parser.parse_args())
 
-finder = Finder(Address("192.168.1.0"), Address(24, is_mask=True))
-devices = finder.find_all()
+if not os.path.exists(args['passwords']) or not os.path.isfile(args['passwords']):
+    passwords = args['passwords'].split(" ")
+else:
+    with open(args['passwords'], "r") as f:
+        passwords = [line.strip() for line in f.readlines()]
+
+devices = Finder(Address(args['net_address']), Address(int(args['mask']), is_mask=True)).find_all()
 
 if not len(devices):
-    print("No devices in network!")
+    message("No devices in network!", INFO)
     exit(0)
 
-uname = "ubnt"
+do_restart = args['do_restart']
+uname = args['uname']
+change_passwd = smart_passwords = True
+new_passwd = args['new_password']
+
+if args['smart_passwords'] is not None:
+    if not os.path.exists(args['smart_passwords']) or not os.path.isfile(args['smart_passwords']):
+        raise FileNotFoundError("Specified smart passwords file does not exist:", args['smart_passwords'])
+    
+    smart_passwords, new_passwds = [True, {}]
+    with open(args['smart_passwords'], "r") as f:
+        for line in [line.strip() for line in f.readlines()]:
+            try:
+                ip_addr, passwd = line.split("$to$")
+            except ValueError:
+                raise ValueError("Incorrect smart passwords file content!")
+            new_passwds[ip_addr] = passwd
+    message("Loaded smart passwords!", SUCCESS)
+
 for addr in devices:
-    print("Trying:", str(addr))
+    message(f"Trying: {str(addr)}", INFO)
     if not bool(Port(addr, 22)):
-        print(f"SSH port not open at {addr}")
+        message(f"SSH port not open at {addr}", INFO)
         continue
 
-    print("Searching for password...")
+    message("Searching for password...", INFO)
     passwd = find_ssh_password(addr, uname, passwords)
+    if new_passwd is None:
+        change_passwd = False
+        new_passwd = passwd
     if passwd is None:
         raise ValueError("Correct password was not found!")
-    print("Password found:", passwd)
+    message(f"Password found: {passwd}", SUCCESS)
 
     try:
         airos = Executor(str(addr), 22, uname, passwd)
-        new_passwd = passwd
-        print(f"Logged in with uname={uname}, passwd={passwd}")
+        message(f"Logged in with uname={uname}, passwd={passwd}", SUCCESS)
     except NoValidConnectionsError:
-        print(f"{addr} not SSH")
+        message(f"{addr} not SSH", ERROR)
         continue
     except AuthenticationException:
         raise ValueError(f"Password `{passwd}` is not valid!")
@@ -120,27 +148,40 @@ for addr in devices:
     for elem in raw_cfg:
         def_cfg[elem[0]] = elem[1]
 
+    # MAIN CONFIGURATION PART
     conf = Configurator(copy.deepcopy(def_cfg))
     conf.set_dns(Address("91.232.50.10"), Address("91.232.52.10"))
-    conf.set_snmp("local", "test.skryptu@test.local", "Banino")
+    conf.set_snmp("local", "test.skryptu.bez.restartu@test.local", "Banino")
     conf.set_ntp(Address("91.232.52.123"))
     conf.set_timezone("-1")
-    # airos.change_password(new_passwd)
-    # conf.change_passwd(uname, new_passwd, airos)
     conf.set_complience_test(airos)
+    
+    # CHANGING PASSWORDS
+    if smart_passwords:
+        try:
+            new_passwd = new_passwds[str(addr)]
+        except KeyError:
+            new_passwd = passwd
+            
+    if change_passwd or smart_passwords:
+        airos.change_password(new_passwd)
+        conf.change_passwd(uname, new_passwd, airos)
 
     new_cfg = conf.cfg
     new_cfg_lines = [f"{elem_key}={new_cfg[elem_key]}\n" for elem_key in list(new_cfg.keys())]
 
     if new_cfg_lines != raw_cfg:
-        # print(new_cfg_lines)
         open("local-system.cfg", "w").writelines(new_cfg_lines)
-        print(f"Trying to upload configuration file with `{new_passwd}` password")
+        message(f"Trying to upload configuration file with `{new_passwd}` password", INFO)
         if os.system(f'sshpass -p "{new_passwd}" scp -o StrictHostKeyChecking=no -O local-system.cfg {uname}@{str(addr)}:/tmp/system.cfg') == 0:
-            print("Configuration saved!")
-            # print(airos.exec("cfgmtd -w && reboot"))
+            message("Configuration saved!", SUCCESS)
+            airos.exec("cfgmtd -w && reboot") if do_restart else airos.exec("cfgmtd -w")
+            message("Configuration applied!", SUCCESS)
         else:
             raise Exception("Error while uploading configuration file!")
+        os.remove("local-system.cfg")
 
     airos.close()
+
+message("Successfully configured all devices!", SUCCESS)
     
