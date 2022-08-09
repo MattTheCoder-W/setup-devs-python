@@ -9,6 +9,7 @@ from argparse import ArgumentParser
 import datetime
 import dateutil.parser
 import os
+from paramiko.ssh_exception import SSHException, NoValidConnectionsError, AuthenticationException
 
 parser = ArgumentParser(description="Randomly reboot devices between two points in time.")
 subparsers = parser.add_subparsers(help="sub-command help")
