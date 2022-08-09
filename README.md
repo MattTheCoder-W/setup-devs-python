@@ -50,11 +50,11 @@ Syntax for this mode: `python reboot-devices.py reboot address mask uname passwo
 
 argument | type | description
 -------- | ---- | -----------
-address | IP Address | Network addres to work on
-mask | Mask Address | Mask address of network
-uname | String | User name on all devices
-passwords | File path or string | List of passwords or file with list of passwords
-time | String | Time interval in which devices should reboot (START_TIME-END_TIME, eg. 22:00-23:00)
+`address` | IP Address | Network addres to work on
+`mask` | Mask Address | Mask address of network
+`uname` | String | User name on all devices
+`passwords` | File path or string | List of passwords or file with list of passwords
+`time` | String | Time interval in which devices should reboot (START_TIME-END_TIME, eg. 22:00-23:00)
 
 ### Mode `clear`
 
@@ -64,7 +64,7 @@ Syntax for this mode: `python reboot-devices.py clear address mask uname passwor
 
 argument | type | description
 -------- | ---- | -----------
-address | IP Address | Network addres to work on
-mask | Mask Address | Mask address of network
-uname | String | User name on all devices
-passwords | File path or string | List of passwords or file with list of passwords
+`address` | IP Address | Network addres to work on
+`mask` | Mask Address | Mask address of network
+`uname` | String | User name on all devices
+`passwords` | File path or string | List of passwords or file with list of passwords
