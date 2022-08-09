@@ -14,13 +14,13 @@ See Help Page: `python setup-dev-oop.py -h`
 
 argument | format | description
 -------- | ------ | -----------
-net_address | IP Address | Network address to configure devices in
-mask | Mask Address | Mask address of network
-uname | String | User name on all devices (for now it has to be the same)
-passwords | File path or string | Path to file with list of passwords for devices or list of password serparated by space
---do-restart | None | When enabled devices will be rebooted after configuration
---new-passwords | String | Single password that will be set on all devices
---smart-passwords | File path | Path to file with specified new passwords for each IP Address
+`net_address` | IP Address | Network address to configure devices in
+`mask` | Mask Address | Mask address of network
+`uname` | String | User name on all devices (for now it has to be the same)
+`passwords` | File path or string | Path to file with list of passwords for devices or list of password serparated by space
+`--do-restart` | None | When enabled devices will be rebooted after configuration
+`--new-passwords` | String | Single password that will be set on all devices
+`--smart-passwords` | File path | Path to file with specified new passwords for each IP Address
 
 ### Smart passwords file format
 
