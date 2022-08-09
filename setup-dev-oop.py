@@ -4,46 +4,45 @@ from connector import Executor
 
 from paramiko.ssh_exception import SSHException
 from paramiko.ssh_exception import NoValidConnectionsError
+from paramiko.ssh_exception import AuthenticationException
 import os
 import copy
 
 
 class Configurator:
     _cfg = {}
-    def __ini__(self, cfg: dict) -> None:
-        pass
+    def __init__(self, cfg: dict) -> None:
+        self.cfg = cfg
 
     @property
     def cfg(self) -> dict:
         return self._cfg
     
     @cfg.setter
-    def cfg(slef, value: dict) -> None:
+    def cfg(self, value: dict) -> None:
         if not isinstance(value, dict):
             raise TypeError("Cfg value must be dictionary!")
         self._cfg = value
 
-    def set_dns(self) -> None:
-        self._cfg["resolv.nameserver.1.ip"] = "91.232.50.10"
-        self._cfg["resolv.nameserver.2.ip"] = "91.232.52.10"
+    def set_dns(self, dns1: Address, dns2: Address) -> None:
+        self._cfg["resolv.nameserver.1.ip"] = str(dns1)
+        self._cfg["resolv.nameserver.2.ip"] = str(dns2)
         self._cfg["resolv.nameserver.1.status"] = "enabled"
         self._cfg["resolv.nameserver.2.status"] = "enabled"
 
-    def set_snmp(self) -> None:
+    def set_snmp(self, community: str, contact: str, location: str) -> None:
         self._cfg["snmp.status"] = "enabled"
-        self._cfg["snmp.community"] = "local"
-        self._cfg["snmp.contact"] = "test-skryptu@net.com"
-        self._cfg["snmp.location"] = "Banino"
+        self._cfg["snmp.community"] = community
+        self._cfg["snmp.contact"] = contact
+        self._cfg["snmp.location"] = location
 
-    def set_ntp(self) -> None:
+    def set_ntp(self, addr: Address) -> None:
         self._cfg["ntpclient.status"] = "enabled"
         self._cfg["ntpclient.1.status"] = "enabled"
-        self._cfg["ntpclient.1.server"] = "91.232.52.123"
+        self._cfg["ntpclient.1.server"] = addr
 
-    def set_timezone(self, number: int) -> None:
-        if not isinstance(number, int):
-            raise TypeError("Timezone number should be int!")
-        self._cfg["system.timezone"] = f"GMT-{number}"
+    def set_timezone(self, number: str) -> None:
+        self._cfg["system.timezone"] = f"GMT{number}"
 
     def change_passwd(self, uname: str, new_password: str, airos: Executor) -> None:
         airos.change_password(new_password)
@@ -63,6 +62,12 @@ class Configurator:
         airos.exec("touch /etc/persistent/ ct")
 
 
+passwords = [
+    "ubnt",
+    "Qwerty12",
+    "haslo123"
+]
+
 finder = Finder(Address("192.168.1.0"), Address(24, is_mask=True))
 devices = finder.find_all()
 
@@ -71,14 +76,23 @@ if not len(devices):
     exit(0)
 
 uname = "ubnt"
-passwd = "1234"
-new_passwd = "1234"
 for addr in devices:
     print("Trying:", str(addr))
-    try:
-        airos = Executor(str(addr), 22, uname, passwd)
-    except NoValidConnectionsError:
-        print(f"{addr} not SSH")
+    skip = False
+    for passwd in passwords:
+        try:
+            airos = Executor(str(addr), 22, uname, passwd)
+            new_passwd = passwd
+            print(f"Logged in with uname={uname}, passwd={passwd}")
+        except NoValidConnectionsError:
+            print(f"{addr} not SSH")
+            skip = True
+        except AuthenticationException:
+            print(f"Password `{passwd}` is not valid, trying another")
+            continue
+        break
+
+    if skip:
         continue
 
     airos.exec("cp /tmp/system.cfg ~/system.cfg.bak")
@@ -89,12 +103,12 @@ for addr in devices:
         def_cfg[elem[0]] = elem[1]
 
     conf = Configurator(copy.deepcopy(def_cfg))
-    conf.set_dns()
-    conf.set_snmp()
-    conf.set_ntp()
+    conf.set_dns(Address("91.232.50.10"), Address("91.232.52.10"))
+    conf.set_snmp("local", "test.skryptu@test.local", "Banino")
+    conf.set_ntp(Address("91.232.52.123"))
     conf.set_timezone("-1")
-    airos.change_password(new_passwd)
-    conf.change_passwd(uname, new_passwd, airos)
+    # airos.change_password(new_passwd)
+    # conf.change_passwd(uname, new_passwd, airos)
     conf.set_complience_test(airos)
 
     new_cfg = conf.cfg
@@ -103,7 +117,8 @@ for addr in devices:
     if new_cfg_lines != raw_cfg:
         print(new_cfg_lines)
         open("local-system.cfg", "w").writelines(new_cfg_lines)
-        if os.system(f'sshpass -p "{new_passwd}" scp -O local-system.cfg {uname}@{str(addr)}:/tmp/system.cfg') == 0:
+        print(f"Trying to upload configuration file with `{new_passwd}` password")
+        if os.system(f'sshpass -p "{new_passwd}" scp -o StrictHostKeyChecking=no -O local-system.cfg {uname}@{str(addr)}:/tmp/system.cfg') == 0:
             print("Configuration saved!")
             print(airos.exec("cfgmtd -w && reboot"))
         else:
