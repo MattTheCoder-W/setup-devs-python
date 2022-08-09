@@ -1,4 +1,5 @@
-from .iplist import IPList, Address
+from .address import Address
+from .network import Network
 from argparse import ArgumentParser
 import os
 import concurrent.futures
@@ -12,7 +13,7 @@ class Finder:
 
     def find_all(self) -> list:
         with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
-            executor.map(self.check_host, IPList().get_range(self.addr, self.mask))
+            executor.map(self.check_host, Network(self.addr, self.mask).addresses)
         return self.found
 
     def check_host(self, addr: Address) -> bool:

@@ -1,7 +1,8 @@
 from classes.finder import Finder
-from classes.iplist import Address
+from classes.address import Address
 from classes.connector import Executor
-from classes.iplist import Port
+from classes.port import Port
+from classes.sshtools import find_ssh_password
 
 from paramiko.ssh_exception import SSHException, NoValidConnectionsError, AuthenticationException
 import os
@@ -15,14 +16,7 @@ ERROR = "!"
 
 def message(text: str, prefix: str):
     print(f"[{prefix}] {text}")
-
-
-def find_ssh_password(addr: Address, uname: str, pass_list: list):
-    for passwd in pass_list:
-        if os.system(f'sshpass -p "{passwd}" ssh -o StrictHostKeyChecking=no -t -l "{uname}" {str(addr)} ":" > /dev/null 2>&1') == 0:
-            return passwd
-    return None
-
+    
 
 class Configurator:
     _cfg = {}
@@ -73,8 +67,17 @@ class Configurator:
                 break
         self._cfg['users.1.password'] = passwd_hash
 
-    def set_complience_test(self, airos: Executor) -> None:
+    def enable_compliance_test(self, airos: Executor) -> None:
         airos.exec("touch /etc/persistent/ ct")
+        self._cfg['radio.1.countrycode'] = "511"
+        self._cfg['radio.countrycode'] = "511"
+        self._cfg['radio.1.dfs.status'] = "disabled"
+    
+    def disable_compliance_test(self, airos: Executor) -> None:
+        airos.exec("rm /etc/persistent/ct 2>/dev/null")
+        self._cfg['radio.1.countrycode'] = "616"
+        self._cfg['radio.countrycode'] = "616"
+        self._cfg['radio.1.dfs.status'] = "enabled"
 
     def set_hostname(self, hostname: str) -> None:
         self._cfg["resolv.host.1.status"] = "enabled"
@@ -103,7 +106,7 @@ else:
     with open(args['passwords'], "r") as f:
         passwords = [line.strip() for line in f.readlines()]
 
-devices = Finder(Address(args['net_address']), Address(int(args['mask']), is_mask=True)).find_all()
+devices = Finder(Address(args['net_address']), Address(int(args['mask']))).find_all()
 
 if not len(devices):
     message("No devices in network!", INFO)
@@ -165,7 +168,7 @@ for addr in devices:
     conf.set_snmp("local", "test.skryptu.bez.restartu@test.local", "Banino")
     conf.set_ntp(Address("91.232.52.123"))
     conf.set_timezone("-1")
-    conf.set_complience_test(airos)
+    conf.disable_compliance_test(airos)
     
     # CHANGING PASSWORDS
     if smart_passwords:
