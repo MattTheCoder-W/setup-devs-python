@@ -11,7 +11,7 @@ import argparse
 
 
 class Configurator:
-    _cfg = {}
+    _cfg = {}  # Configuration variable
     def __init__(self, cfg: dict) -> None:
         self.cfg = cfg
         self.languages = ["pl_PL", "en_US"]
@@ -27,27 +27,34 @@ class Configurator:
         self._cfg = value
 
     def set_dns(self, dns1: Address, dns2: Address) -> None:
+        # Set DNS Addresses
         self._cfg["resolv.nameserver.1.ip"] = str(dns1)
         self._cfg["resolv.nameserver.2.ip"] = str(dns2)
         self._cfg["resolv.nameserver.1.status"] = "enabled"
         self._cfg["resolv.nameserver.2.status"] = "enabled"
 
     def set_snmp(self, community: str, contact: str, location: str) -> None:
+        # Set SNMP information
         self._cfg["snmp.status"] = "enabled"
         self._cfg["snmp.community"] = community
         self._cfg["snmp.contact"] = contact
         self._cfg["snmp.location"] = location
 
     def set_ntp(self, addr: Address) -> None:
+        # Set NTP Address
         self._cfg["ntpclient.status"] = "enabled"
         self._cfg["ntpclient.1.status"] = "enabled"
         self._cfg["ntpclient.1.server"] = addr
 
     def set_timezone(self, number: str) -> None:
+        # Set timezone (GMT format)
         self._cfg["system.timezone"] = f"GMT{number}"
 
     def change_passwd(self, uname: str, new_password: str, airos: Executor) -> None:
-        airos.change_password(new_password)
+        # Change password on device
+        airos.change_password(new_password)  # First, change password in ssh shell
+        
+        # Then get new password hash from /etc/passwd
         passwd_hash = airos.read_file("/etc/passwd")
         for line in passwd_hash:
             if uname in line:
@@ -57,6 +64,8 @@ class Configurator:
             if uname in elem:
                 passwd_hash = passwd_hash[i+1]
                 break
+
+        # Set obtained hash into device configuration
         self._cfg['users.1.password'] = passwd_hash
 
     def enable_compliance_test(self, airos: Executor) -> None:
