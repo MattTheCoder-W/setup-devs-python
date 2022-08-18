@@ -1,4 +1,4 @@
-### Automated airOS devices setup (Python)
+<h1 align="center">Automated airOS devices setup (Python)</h1>
 
 ## Requirements
 
