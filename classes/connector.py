@@ -3,8 +3,13 @@ from paramiko import AutoAddPolicy
 
 
 class Executor:
-    """
-    Klasa Executor pozwala na komunikację z urządzeniem ubiquiti.
+    """Class for communication with Ubiquiti devices over SSH.
+
+    Arguments:
+        addr (str) -- Address of device
+        port (int) -- Port value (22 for ssh)
+        uname (str) -- Username
+        passwd (str) -- Password
     """
     _addr = _port = _uname = _passwd = None
     def __init__(self, addr: str, port: int, uname: str, passwd: str) -> None:
@@ -13,45 +18,44 @@ class Executor:
         self._uname = uname
         self._passwd = passwd
 
-        # Połączenie SSH
+        # Connect to device over SSH
         self.client = SSHClient()
         self.client.load_system_host_keys()
         self.client.set_missing_host_key_policy(AutoAddPolicy())
         self.client.connect(self._addr, port=self._port, username=self._uname, password=self._passwd, banner_timeout=60)
-        self.transport = self.client.get_transport()  # `transport` do sprawdzania czy połączenie jest aktywne
+        self.transport = self.client.get_transport()  # `transport` is used for connection state check
     
     @property
     def data(self) -> dict:
-        # Zwraca podstawowe informacje o urządzeniu
+        """Return information about device."""
         return {"addr": self._addr, "port": self._port, "uname": self._uname, "passwd": self._passwd}
     
     @property
     def active(self) -> bool:
-        # Zwraca status połączenia
+        """Return state of connection."""
         return self.transport.is_active()
 
     def exec(self, cmd: str, path: str = None) -> list:
-        # Wywołuje komendę na urządzniu (z opcjonalnym wyznaczeniem ścieżki wywołania)
+        """Execute command on device in optionally specified location."""
         if not self.active:
             raise ConnectionAbortedError("Lost connection!")
         if path:
             cmd = f"cd {path}; {cmd}"
         stdin, stdout, stderr = self.client.exec_command(cmd)
-        return [stdout.readlines(), stderr.readlines()]  # Zwaraca [Wynik wykonania, błedy wykonania]
+        return [stdout.readlines(), stderr.readlines()]
 
     def exec_input(self, cmd: str, inpt: list) -> list:
-        # Wywołuje komendę na urządzeniu z symulowaniem wejścia użytkownika
-        # (co element z listy wciskany jest enter)
+        """Execute command on device with user input."""
         if not self.active:
             raise ConnectionAbortedError("Lost connection!")
         stdin, stdout, stderr = self.client.exec_command(cmd)
         for line in inpt:
             stdin.write(line + "\n")
         stdin.close()
-        return [stdout.readlines(), stderr.readlines()]  # Zwaraca [Wynik wykonania, błedy wykonania]
+        return [stdout.readlines(), stderr.readlines()]
 
     def change_password(self, new_password: str) -> bool:
-        # Zmienia hasło na urządzeniu
+        """Change password on device (without permanent change)"""
         if type(new_password) is not str:
             raise TypeError("Password should be string!")
         out, err = self.exec_input(f"passwd {self._uname}", [new_password, new_password])
@@ -62,14 +66,14 @@ class Executor:
         return True
     
     def list_files(self) -> list:
-        # Zwraca listę plików znajdujących się w katalogu dommowym /etc/persistent
+        """List files in home location (/etc/persistent)."""
         out, err = self.exec("ls .")
         if len(err):
             print("Errors", err)
         return out
     
     def create_file(self, filename: str) -> bool:
-        # Tworzy plik
+        """Create new file."""
         if type(filename) is not str:
             raise TypeError("Filename should be string!")
         if len(filename) == 0:
@@ -81,7 +85,7 @@ class Executor:
         return True
 
     def write_to_file(self, filename: str, lines: list, overwrite: bool = False) -> bool:
-        # Wpisuje dane do pliku lub je dopisuje (opcja overwrite)
+        """Write data to file or append to file (when overwrite is True)"""
         if type(filename) is not str:
             raise TypeError("Filename should be string!")
         if len(filename) == 0:
@@ -98,7 +102,7 @@ class Executor:
         return True
     
     def read_file(self, filename: str) -> list:
-        # Zwraca listę linijek tekstu z pliku
+        """Return file content."""
         if type(filename) is not str:
             raise TypeError("Filename should be string!")
         if len(filename) == 0:
@@ -110,9 +114,7 @@ class Executor:
         return out
     
     def get_location(self) -> str:
-        # Zwraca ścieżkę katalogu domowego urządzenia 
-        # (nie można stale zmieniać ścieżki,
-        # gdyż co wywołanie polecenia przywracana jest do katalogu domowego)
+        """Return home catalog path."""
         out, err = self.exec("pwd")
         if len(err):
             print("Error while getting location", err)
@@ -120,17 +122,16 @@ class Executor:
         return out[0].strip()
 
     def close(self):
-        # Zamyka połączenie
+        """Close connection."""
         self.client.close()
 
     def __bool__(self) -> bool:
-        # Zwraca status połączenia
+        """Return connection state."""
         return self.active
 
 
 def manual_test(airos: Executor):
-    # Testy wywołania poleceń
-    
+    """Test execution of Executor class methods."""
     print("Lista plików", "="*25)
     for file in airos.list_files():
         print("File:", file.strip())
