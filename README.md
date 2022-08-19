@@ -1,4 +1,4 @@
-### Automated airOS devices setup (Python)
+<h1 align="center">Automated airOS devices setup (Python)</h1>
 
 ## Requirements
 
@@ -68,3 +68,12 @@ argument | type | description
 `mask` | Mask Address | Mask address of network
 `uname` | String | User name on all devices
 `passwords` | File path or string | List of passwords or file with list of passwords
+
+# To Do (Cleaning Up)
+
+- [ ] Implement new IPList class
+- [ ] Remove unused classes and imports
+- [ ] Add docstring for every function
+- [ ] Write comments to more important lines
+- [ ] Add title comment (Author, description, etc.)
+- [ ] Optimize script
