@@ -104,6 +104,7 @@ class Configurator:
 
 
 if __name__ == "__main__":
+    # Pozyskiwanie argumentów od użytkownika
     parser = argparse.ArgumentParser(description="Automated airos ssh configuration tool")
     parser.add_argument("net_address", type=str, help="Network address")
     parser.add_argument("mask", type=str, help="Mask address")
