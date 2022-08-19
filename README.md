@@ -71,9 +71,8 @@ argument | type | description
 
 # To Do (Cleaning Up)
 
-- [ ] Implement new IPList class
-- [ ] Remove unused classes and imports
+- [x] Remove unused classes and imports
 - [ ] Add docstring for every function
-- [ ] Write comments to more important lines
+- [x] Write comments to more important lines
 - [ ] Add title comment (Author, description, etc.)
-- [ ] Optimize script
+- [x] Optimize script
