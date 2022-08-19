@@ -1,5 +1,4 @@
-from .address import Address
-from .octet import Octet
+from .address import Address, Octet
 from abc import ABC, abstractmethod, abstractproperty
 import copy
 
