@@ -6,6 +6,9 @@ import concurrent.futures
 
 
 class Finder:
+    """
+    Klasa Finder znajduje wszystkie aktywne adresy z danej sieci.
+    """
     def __init__(self, addr: Address, mask: Address) -> None:
         self.addr = addr
         self.mask = mask
