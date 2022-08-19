@@ -1,18 +1,34 @@
-from typing import Union, TypeVar
-import copy
+#################################
+# Classes for Address management
+# Author: MattTheCoder-W
+#################################
+
 import os
+import copy
 import socket
+from typing import Union, TypeVar
 
-from .octet import Octet
 from .binary import binary_sum, binary_sub
+from .octet import Octet
 
+# Custom types
 TAddress = TypeVar("TAddress", bound="Address")
 TOctet = TypeVar("TOctet", bound="Octet")
 
 
 class Address:
-    _octets = []
-    _mask = False
+    """Class for representation of IPv4 Address.
+
+    Arguments:
+        octets (str|int|list) -- Octet values of address
+            str -- "x.x.x.x" format
+            int -- 0-30 format (for masks)
+            list -- list of 4 values in [Octet|str|int] format
+    """
+
+    _octets = []  # List for octet values
+    _mask = False  # Mask mode flag
+    
     def __init__(self, octets: Union[str, int, list]) -> None:
         self.octets = octets
     
@@ -59,9 +75,11 @@ class Address:
         self._mask = value
 
     def get_binary(self) -> str:
+        """Return binary representation of address in 32-bit binary string format."""
         return f"{self._octets[0].get_binary()}{self._octets[1].get_binary()}{self._octets[2].get_binary()}{self._octets[3].get_binary()}"
 
     def increment_with_difference_mask(self, difference_mask: TAddress, value = 1) -> TAddress:
+        """Increment address using difference mask (used for calculating sub-network addresses)."""
         if not isinstance(difference_mask, type(self)):
             raise TypeError("Difference mask should be `Address` object")
         str_addr = ''.join(self.get_binary())
@@ -150,12 +168,11 @@ class Address:
 
 
 class Port:
-    """
-    Address + Port value. Representing socket with Address and Port values.
+    """Class for socket representation.
 
     Attributes:
-        addr (Address): Address value of socket
-        value (int): Port value of socket
+        addr (Address) -- Address value of socket.
+        value (int) -- Port value of socket.
     """
     __slots__ = ["_value", "_addr"]
     def __init__(self, addr: Address, value: int):
@@ -186,11 +203,10 @@ class Port:
         self._addr = value
     
     def _check_state(self) -> bool:
-        """
-        Check if this Port object is up in network. (Port is open)
+        """Check if Port is up in network.
 
         Returns:
-            bool: Port state (Open/Closed)
+            bool -- Port state.
         """
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(0.2)
@@ -209,8 +225,16 @@ class Port:
 
 
 class Octet:
+    """Class for representing address Octet value.
+
+    Arguments:
+        value (int|str) -- Value of octet (in range 0-255).
+        ignore_range [opt] (bool) -- Allow for value out of 0-255 range (Default: False).
+    """
+
     _value = 0
     _ignore_range = False
+
     def __init__(self, value: Union[int, str], ignore_range: bool = False) -> None:
         self._ignore_range = ignore_range
         self.value = value
@@ -232,9 +256,11 @@ class Octet:
     
     @staticmethod
     def _check_binary(value: str) -> bool:
+        """Check if value is 8-bit binary."""
         return True if len(value) == (value.count("1") + value.count("0")) and len(value) == 8 else False
 
     def get_binary(self) -> str:
+        """Return binary representation of octet value."""
         return str(format(self._value, "#010b")[2:])
     
     def __int__(self) -> int:
