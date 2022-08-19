@@ -11,6 +11,12 @@ import argparse
 
 
 class Configurator:
+    """
+    Klasa Configurator ma na celu odpowiednią zmianę
+    konfiguracji przekazanej w postaci słownika.
+
+    Sama klasa nie wgrywa konfiguracji na urządzenie.
+    """
     _cfg = {}  # Configuration variable
     def __init__(self, cfg: dict) -> None:
         self.cfg = cfg
@@ -26,35 +32,36 @@ class Configurator:
             raise TypeError("Cfg value must be dictionary!")
         self._cfg = value
 
-    def set_dns(self, dns1: Address, dns2: Address) -> None:
-        # Set DNS Addresses
+    def set_dns(self, dns1: Address, dns2: Address = None) -> None:
+        # Ustawianie adresów DNS
         self._cfg["resolv.nameserver.1.ip"] = str(dns1)
-        self._cfg["resolv.nameserver.2.ip"] = str(dns2)
         self._cfg["resolv.nameserver.1.status"] = "enabled"
-        self._cfg["resolv.nameserver.2.status"] = "enabled"
+        if dns2 is not None:
+            self._cfg["resolv.nameserver.2.status"] = "enabled"
+            self._cfg["resolv.nameserver.2.ip"] = str(dns2)
 
     def set_snmp(self, community: str, contact: str, location: str) -> None:
-        # Set SNMP information
+        # Ustawianie parametrów SNMP
         self._cfg["snmp.status"] = "enabled"
         self._cfg["snmp.community"] = community
         self._cfg["snmp.contact"] = contact
         self._cfg["snmp.location"] = location
 
     def set_ntp(self, addr: Address) -> None:
-        # Set NTP Address
+        # Ustawianie adresu NTP
         self._cfg["ntpclient.status"] = "enabled"
         self._cfg["ntpclient.1.status"] = "enabled"
         self._cfg["ntpclient.1.server"] = addr
 
     def set_timezone(self, number: str) -> None:
-        # Set timezone (GMT format)
+        # Ustawianie strefy czasowej (w formacie GMT-X)
         self._cfg["system.timezone"] = f"GMT{number}"
 
     def change_passwd(self, uname: str, new_password: str, airos: Executor) -> None:
-        # Change password on device
-        airos.change_password(new_password)  # First, change password in ssh shell
+        # Zmiana hasła na urządzeniu
+        airos.change_password(new_password)  # Najpierw, zmieniane jest hasło poprzez SSH
         
-        # Then get new password hash from /etc/passwd
+        # Następnie pozyskiwany jest hash hasła z pliku /etc/passwd
         passwd_hash = airos.read_file("/etc/passwd")
         for line in passwd_hash:
             if uname in line:
@@ -65,26 +72,31 @@ class Configurator:
                 passwd_hash = passwd_hash[i+1]
                 break
 
-        # Set obtained hash into device configuration
+        # Pozyskany hash zapisywany jest w konfiguracji urządzenia
+        # Dzięki temu nie zostanie przywrócone stare hasło po ponownym uruchomieniu.
         self._cfg['users.1.password'] = passwd_hash
 
     def enable_compliance_test(self, airos: Executor) -> None:
+        # Włączanie "Compliance test"
         airos.exec("touch /etc/persistent/ ct")
         self._cfg['radio.1.countrycode'] = "511"
         self._cfg['radio.countrycode'] = "511"
         self._cfg['radio.1.dfs.status'] = "disabled"
     
     def disable_compliance_test(self, airos: Executor) -> None:
+        # Wyłączanie "Compliance test"
         airos.exec("rm /etc/persistent/ct 2>/dev/null")
         self._cfg['radio.1.countrycode'] = "616"
         self._cfg['radio.countrycode'] = "616"
         self._cfg['radio.1.dfs.status'] = "enabled"
 
     def set_hostname(self, hostname: str) -> None:
+        # Ustawianie nazwy hosta
         self._cfg["resolv.host.1.status"] = "enabled"
         self._cfg["resolv.host.1.name"] = hostname
     
     def change_language(self, language: str) -> None:
+        # Zmiana języka (pl_PL lub en_US)
         if language not in self.languages:
             print("Language not in language list!")
             return
@@ -102,29 +114,30 @@ if __name__ == "__main__":
     parser.add_argument("--smart-passwords", type=str, help="Path to file with new passwords assigned to specific ip addresses. (format: IP:PASS)")
     args = vars(parser.parse_args())
 
-    # Parse password input from user (if file -> read file, else -> split input by spaces)
+    # Sprawdzanie czy użytkownik jako argument podał ścieżkę do pliku z hasłami czy listę haseł.
     if not os.path.exists(args['passwords']) or not os.path.isfile(args['passwords']):
         passwords = args['passwords'].split(" ")
     else:
         with open(args['passwords'], "r") as f:
             passwords = [line.strip() for line in f.readlines()]
 
-    # Get list of devices in network
+    # Pozyskiwanie listy urządzeń w wybranej sieci
     devices = Finder(Address(args['net_address']), Address(int(args['mask']))).find_all()
 
     if not len(devices):
-        # Exit if no devices
+        # Brak urządzeń w sieci
         print("No devices in network!")
         exit(0)
 
-    # Variables for configuration
+    # Zmienne do sposobu konfiguracji urządzeń
     do_restart = args['do_restart']
     uname = args['uname']
     change_passwd = smart_passwords = True
     new_passwd = args['new_password']
 
-    # Setup smart-passwords (specific passwords for specific IP Addresses)
     if args['smart_passwords'] is not None:
+        # Wczytywanie haseł przypisanych do adresów ip z podanej ścieżki
+
         if not os.path.exists(args['smart_passwords']) or not os.path.isfile(args['smart_passwords']):
             raise FileNotFoundError("Specified smart passwords file does not exist:", args['smart_passwords'])
         
@@ -138,6 +151,7 @@ if __name__ == "__main__":
                 new_passwds[ip_addr] = passwd
         print("Loaded smart passwords!")
 
+    # Konfiguracja wszystkich urządzeń w sieci
     for addr in devices:
         print(f"Trying: {str(addr)}")
         if not bool(Port(addr, 22)):
@@ -145,7 +159,7 @@ if __name__ == "__main__":
             continue
 
         print("Searching for password...")
-        passwd = find_ssh_password(addr, uname, passwords)
+        passwd = find_ssh_password(addr, uname, passwords)  # Funkcja z pliku classes/sshtools.py
         if new_passwd is None:
             change_passwd = False
             new_passwd = passwd
@@ -170,7 +184,7 @@ if __name__ == "__main__":
         for elem in raw_cfg:
             def_cfg[elem[0]] = elem[1]
 
-        # MAIN CONFIGURATION PART
+        # Główna konfiguracja
         conf = Configurator(copy.deepcopy(def_cfg))
         conf.set_dns(Address("91.232.50.10"), Address("91.232.52.10"))
         conf.set_snmp("local", "test.skryptu.bez.restartu@test.local", "Banino")
@@ -178,7 +192,7 @@ if __name__ == "__main__":
         conf.set_timezone("-1")
         conf.disable_compliance_test(airos)
         
-        # CHANGING PASSWORDS
+        # Zmiana hasła
         if smart_passwords:
             try:
                 new_passwd = new_passwds[str(addr)]
@@ -189,12 +203,15 @@ if __name__ == "__main__":
             airos.change_password(new_passwd)
             conf.change_passwd(uname, new_passwd, airos)
 
+        # Konwersja słownika nowej konfiguracji do listy linijek tekstu (do zapisu na urządzeniu)
         new_cfg = conf.cfg
         new_cfg_lines = [f"{elem_key}={new_cfg[elem_key]}\n" for elem_key in list(new_cfg.keys())]
 
-        if new_cfg_lines != raw_cfg:
-            open("local-system.cfg", "w").writelines(new_cfg_lines)
+        if new_cfg_lines != raw_cfg:  # Jeżeli nastąpiła jakakolwiek zmiana w konfiguracji
+            open("local-system.cfg", "w").writelines(new_cfg_lines)  # Zapis lokalnego pliku nowej konfiguracji.
             print(f"Trying to upload configuration file with `{new_passwd}` password")
+
+            # Próba przesłania pliku na urządzenie (z wykorzystaniem nowego hasła jeżeli zostało ono zmienione)
             if os.system(f'sshpass -p "{new_passwd}" scp -o StrictHostKeyChecking=no -O local-system.cfg {uname}@{str(addr)}:/tmp/system.cfg') == 0:
                 print("Configuration saved!")
                 airos.exec("cfgmtd -w && reboot") if do_restart else airos.exec("cfgmtd -w")
