@@ -72,7 +72,7 @@ argument | type | description
 # To Do (Cleaning Up)
 
 - [x] Remove unused classes and imports
-- [ ] Add docstring for every function
+- [x] Add docstring for every function
 - [x] Write comments to more important lines
-- [ ] Add title comment (Author, description, etc.)
+- [x] Add title comment (Author, description, etc.)
 - [x] Optimize script
