@@ -102,6 +102,7 @@ class Configurator:
             return
         self.cfg["gui.language"] = language
 
+CONFIGURED = 0
 
 if __name__ == "__main__":
     # Pozyskiwanie argumentów od użytkownika
@@ -222,5 +223,9 @@ if __name__ == "__main__":
             os.remove("local-system.cfg")
 
         airos.close()
+        CONFIGURED += 1
 
-    print("Successfully configured all devices!")
+    if CONFIGURED > 0:
+        print("Successfully configured all devices!")
+    else:
+        print("No devices configured!")
