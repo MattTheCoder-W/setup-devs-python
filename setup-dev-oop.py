@@ -223,7 +223,7 @@ if __name__ == "__main__":
             try:
                 new_passwd = new_passwds[str(addr)]
             except KeyError:
-                new_passwd = passwd
+                new_passwd = passwd  # Don't change password when device is not in smart-pass dict
                 
         if change_passwd or smart_passwords:
             airos.change_password(new_passwd)
